@@ -1,14 +1,33 @@
-FROM eclipse-temurin:17-jdk-focal as builder
+# Build-vaihe
+FROM eclipse-temurin:17-jdk-focal AS builder
+
 WORKDIR /opt/app
+
+# Kopioi Mavenin asetukset ja projektin metadata
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
 RUN chmod +x ./mvnw
-RUN ./mvnw dependency:go-offline
-COPY ./src ./src
-RUN ./mvnw clean install -DskipTests 
-RUN find ./target -type f -name '*.jar' -exec cp {} /opt/app/app.jar \; -quit
 
+# Lataa riippuvuudet
+RUN ./mvnw dependency:go-offline
+
+# Kopioi lähdekoodi
+COPY ./src ./src
+
+# Buildaa projekti
+RUN ./mvnw clean install -DskipTests
+
+# Kopioi JAR-tiedosto suoraan (ei käytetä find-komentoa)
+RUN cp target/*.jar /opt/app/app.jar
+
+# Runtime-vaihe
 FROM eclipse-temurin:17-jre-alpine
-COPY --from=builder /opt/app/*.jar /opt/app/
+
+WORKDIR /opt/app
+
+# Kopioi buildattu JAR-tiedosto
+COPY --from=builder /opt/app/app.jar /opt/app/app.jar
+
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/opt/app/app.jar" ]
+
+ENTRYPOINT ["java", "-jar", "/opt/app/app.jar"]
